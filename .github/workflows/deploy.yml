@@ -1,0 +1,80 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          # Note: I'm keeping your original SSH key name, assuming it has access to both servers
+          ssh-private-key: ${{ secrets.SYDANI_WEB_SSH_PRIVATE_KEY }}
+
+      # --- START MODIFICATION ---
+
+      - name: Set Server IP and Deployment Path
+        run: |
+          # The branch name is available as ${{ github.ref_name }}
+          # Use secrets for IP addresses to keep them secure and easy to change.
+          # You will need to define DEV_IP and PROD_IP in your repository secrets.
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            echo "SERVER_IP=${{ secrets.PROD_IP }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/var/www/fhsa/backend" >> $GITHUB_ENV # Example: separate PROD path
+          elif [ "${{ github.ref_name }}" == "dev" ]; then
+            echo "SERVER_IP=${{ secrets.DEV_IP }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/var/www/fhsa/backend/dev" >> $GITHUB_ENV   # Example: separate DEV path
+          else
+            # Fallback for other branches (though `on` section only allows main/dev)
+            echo "SERVER_IP=${{ secrets.DEV_IP }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=/var/www/fhsa/backend/staging" >> $GITHUB_ENV
+          fi
+
+      - name: Debug deployment variables
+        run: |
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Deploying to IP: $SERVER_IP"
+          echo "Deploying to Path: $DEPLOY_PATH"
+
+      - name: Add Server to known hosts
+        # IMPORTANT: Use the determined $SERVER_IP
+        # The IP must be a variable for this step to run successfully for either branch.
+        run: ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
+
+      - name: Create deployment directory on server
+        # IMPORTANT: Use $SERVER_IP and $DEPLOY_PATH
+        run: ssh -o StrictHostKeyChecking=no root@$SERVER_IP "mkdir -p $DEPLOY_PATH"
+
+      - name: Copy source code to server
+        # IMPORTANT: Use $SERVER_IP and $DEPLOY_PATH
+        run: |
+          rsync -avz --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'node_modules/' \
+            --exclude '.next/' \
+            --exclude 'static/' \
+            --exclude 'media/' \
+            --exclude '.dockerignore' \
+            --exclude 'docker-compose.yml' \
+            --exclude 'Dockerfile' \
+            --exclude 'deploy.sh' \
+            --exclude '.env' \
+            ./ root@$SERVER_IP:$DEPLOY_PATH/
+
+      - name: Build and deploy on server
+        # IMPORTANT: Use $SERVER_IP and $DEPLOY_PATH
+        run: |
+          ssh -o StrictHostKeyChecking=no root@$SERVER_IP "cd $DEPLOY_PATH && bash ./deploy.sh"
+
+      # --- END MODIFICATION ---
