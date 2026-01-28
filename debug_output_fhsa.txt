@@ -1,0 +1,13 @@
+DB Found at C:\Users\CHIMDIEBUBE.A_SYDANI\Desktop\FHSA\backend\fhsa.db
+--- Inspecting Users ---
+All Users:
+  ID=1, Email=admin@fhsa.org, Role=admin
+  ID=2, Email=abraham@gmail.com, Role=business_user
+  ID=3, Email=user@gmail.com, Role=business_user
+  ID=4, Email=abraham@gmaik.com, Role=business_user
+Found Target User ID: 2
+--- Inspecting Requests for User ---
+Total Requests found: 2
+Req ID: 1, Status: 'pending'
+Req ID: 2, Status: 'pending'
+Counted 'pending': 2
